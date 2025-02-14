@@ -1,0 +1,21 @@
+[package]
+name = "alltrailsgpx"
+version = "0.1.0"
+edition = "2021"
+authors = ["Chris Down <chris@chrisdown.name>"]
+description = "Get GPX files from Alltrails"
+repository = "https://github.com/cdown/alltrailsgpx"
+readme = "README.md"
+keywords = ["gpx", "hiking", "alltrails"]
+categories = ["command-line-utilities"]
+license = "MIT"
+rust-version = "1.75"
+
+[dependencies]
+anyhow = "1.0.95"
+clap = { version = "4.5.29", features = ["derive"] }
+geo-types = "0.7.15"
+gpx = "0.10.0"
+polyline = "0.11.0"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"
