@@ -12,7 +12,7 @@ license = "MIT"
 rust-version = "1.75"
 
 [dependencies]
-anyhow = "1.0.95"
+anyhow = "1.0.98"
 clap = { version = "4.5.29", features = ["derive"] }
 geo-types = "0.7.15"
 gpx = "0.10.0"
