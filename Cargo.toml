@@ -13,7 +13,7 @@ rust-version = "1.75"
 
 [dependencies]
 anyhow = "1.0.98"
-clap = { version = "4.5.37", features = ["derive"] }
+clap = { version = "4.5.38", features = ["derive"] }
 geo-types = "0.7.16"
 gpx = "0.10.0"
 polyline = "0.11.0"
