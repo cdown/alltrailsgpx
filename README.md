@@ -14,7 +14,7 @@ First, get the input file.
 
 1. Open the full screen map page for the route you want to convert (e.g., `https://www.alltrails.com/en-gb/trail/england/bristol/bristol-and-abbots-leigh-circular`)
 2. Open your browser's developer tools and navigate to the network tab.
-3. Find the network request to the AllTrails API, which will look similar (e.g., `https://www.alltrails.com/api/alltrails/v3/trails/{route_id}`)
+3. Find the network request to the AllTrails API, which will look similar (e.g., `https://www.alltrails.com/api/alltrails/v3/trails/{route_id}?detail=offline&key={api_key}`)
 4. Save the response to a file.
 
 Now you can provide this response to alltrailsgpx. By default the GPX is read
