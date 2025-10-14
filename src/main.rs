@@ -35,16 +35,27 @@ fn read_input(input: &Option<String>) -> Result<String> {
     Ok(contents)
 }
 
+fn find_in_json<'a>(json: &'a Value, paths: &[&str]) -> Option<&'a Value> {
+    paths.iter().find_map(|path| json.pointer(path))
+}
+
+// - detail=offline: has "trails" array at root (e.g., /trails/0/defaultMap/routes/0/...)
+// - detail=deep: has "maps" array at root (e.g., /maps/0/routes/0/...)
 fn extract_polyline(json: &Value) -> Result<&str> {
-    json.pointer("/trails/0/defaultMap/routes/0/lineSegments/0/polyline/pointsData")
-        .context("Polyline data not found in JSON")?
-        .as_str()
-        .context("Polyline data is not a string")
+    find_in_json(
+        json,
+        &[
+            "/trails/0/defaultMap/routes/0/lineSegments/0/polyline/pointsData",
+            "/maps/0/routes/0/lineSegments/0/polyline/pointsData",
+        ],
+    )
+    .context("Polyline data not found in JSON")?
+    .as_str()
+    .context("Polyline data is not a string")
 }
 
 fn extract_route_name(json: &Value) -> Result<String> {
-    Ok(json
-        .pointer("/trails/0/name")
+    Ok(find_in_json(json, &["/trails/0/name", "/maps/0/name"])
         .context("Route name not found in JSON")?
         .to_string())
 }
