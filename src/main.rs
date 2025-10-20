@@ -47,10 +47,7 @@ fn create_gpx(line_string: geo_types::LineString<f64>, name: &str) -> Track {
     let waypoints = line_string
         .0
         .into_iter()
-        .map(|coord| {
-            let point = geo_types::Point::new(coord.x, coord.y);
-            Waypoint::new(point)
-        })
+        .map(|coord| Waypoint::new(coord.into()))
         .collect::<Vec<_>>();
 
     let segment = TrackSegment { points: waypoints };
