@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use derive_more::Deref;
 use gpx::{Gpx, GpxVersion, Track, TrackSegment, Waypoint};
 use serde_json::Value;
 use std::fs::File;
@@ -16,14 +17,20 @@ pub struct Args {
     pub output: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, Deref)]
+pub struct Polyline<'a>(&'a str);
+
+#[derive(Debug, Clone, Copy, Deref)]
+pub struct RouteName<'a>(&'a str);
+
 pub fn find_in_json<'json>(json: &'json Value, paths: &[&str]) -> Option<&'json Value> {
     paths.iter().find_map(|path| json.pointer(path))
 }
 
 // - detail=offline: has "trails" array at root (e.g., /trails/0/defaultMap/routes/0/...)
 // - detail=deep: has "maps" array at root (e.g., /maps/0/routes/0/...)
-pub fn extract_polyline(json: &Value) -> Result<&str> {
-    find_in_json(
+pub fn extract_polyline(json: &Value) -> Result<Polyline<'_>> {
+    let polyline_str = find_in_json(
         json,
         &[
             "/trails/0/defaultMap/routes/0/lineSegments/0/polyline/pointsData",
@@ -32,17 +39,21 @@ pub fn extract_polyline(json: &Value) -> Result<&str> {
     )
     .context("Polyline data not found in JSON")?
     .as_str()
-    .context("Polyline data is not a string")
+    .context("Polyline data is not a string")?;
+
+    Ok(Polyline(polyline_str))
 }
 
-pub fn extract_route_name(json: &Value) -> Result<&str> {
-    find_in_json(json, &["/trails/0/name", "/maps/0/name"])
+pub fn extract_route_name(json: &Value) -> Result<RouteName<'_>> {
+    let name_str = find_in_json(json, &["/trails/0/name", "/maps/0/name"])
         .context("Route name not found in JSON")?
         .as_str()
-        .context("Route name data is not a string")
+        .context("Route name data is not a string")?;
+
+    Ok(RouteName(name_str))
 }
 
-pub fn create_gpx(line_string: geo_types::LineString<f64>, name: &str) -> Track {
+pub fn create_gpx(line_string: geo_types::LineString<f64>, name: RouteName) -> Track {
     let waypoints = line_string
         .0
         .into_iter()
@@ -96,11 +107,11 @@ pub fn get_output_writer(output: &Option<String>) -> Result<Box<dyn Write>> {
 pub fn run(reader: impl Read, writer: impl Write) -> Result<()> {
     let json: Value = serde_json::from_reader(reader).context("Failed to parse JSON input")?;
 
-    let polyline_str = extract_polyline(&json)?;
+    let polyline = extract_polyline(&json)?;
     let route_name = extract_route_name(&json)?;
 
     let line_string =
-        polyline::decode_polyline(polyline_str, 5).context("Failed to decode polyline")?;
+        polyline::decode_polyline(&polyline, 5).context("Failed to decode polyline")?;
 
     let track = create_gpx(line_string, route_name);
 
