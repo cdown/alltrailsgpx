@@ -59,7 +59,7 @@ fn create_gpx(line_string: geo_types::LineString<f64>, name: &str) -> Track {
     }
 }
 
-fn write_gpx<W: Write>(track: Track, writer: W) -> Result<()> {
+fn write_gpx(track: Track, writer: impl Write) -> Result<()> {
     let gpx = Gpx {
         version: GpxVersion::Gpx11,
         creator: Some("alltrailsgpx".to_string()),
@@ -92,7 +92,7 @@ fn get_output_writer(output: &Option<String>) -> Result<Box<dyn Write>> {
     }
 }
 
-fn run<R: Read, W: Write>(reader: R, writer: W) -> Result<()> {
+fn run(reader: impl Read, writer: impl Write) -> Result<()> {
     let json: Value = serde_json::from_reader(reader).context("Failed to parse JSON input")?;
 
     let polyline_str = extract_polyline(&json)?;
