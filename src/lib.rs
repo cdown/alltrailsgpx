@@ -129,17 +129,17 @@ pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn Read>, Error> 
 
 pub fn get_output_writer(output: &Option<String>) -> Result<Box<dyn Write>, Error> {
     let writer: Box<dyn Write> = match output.as_deref() {
-        None | Some("-") => Box::new(std::io::stdout()),
+        None | Some("-") => Box::new(std::io::stdout().lock()),
         Some(file_name) => {
             let file = File::create(file_name).map_err(|source| Error::FileError {
                 path: file_name.to_string(),
                 source,
             })?;
-            Box::new(file)
+            Box::new(BufWriter::new(file))
         }
     };
 
-    Ok(Box::new(BufWriter::new(writer)))
+    Ok(writer)
 }
 
 pub fn run(reader: impl Read, writer: impl Write) -> Result<(), Error> {
