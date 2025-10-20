@@ -89,7 +89,6 @@ pub fn extract_route_name(json: &Value) -> Result<RouteName<'_>, Error> {
 
 pub fn create_gpx(line_string: geo_types::LineString<f64>, name: RouteName<'_>) -> Track {
     let waypoints: Vec<Waypoint> = line_string
-        .into_inner()
         .into_iter()
         .map(|coord| Waypoint::new(coord.into()))
         .collect();
