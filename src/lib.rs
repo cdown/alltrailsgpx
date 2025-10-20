@@ -81,14 +81,16 @@ pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn Read>> {
 }
 
 pub fn get_output_writer(output: &Option<String>) -> Result<Box<dyn Write>> {
-    match output.as_deref() {
-        None | Some("-") => Ok(Box::new(std::io::stdout())),
+    let writer: Box<dyn Write> = match output.as_deref() {
+        None | Some("-") => Box::new(std::io::stdout()),
         Some(file_name) => {
             let file = File::create(file_name)
                 .with_context(|| format!("Failed to create file: {file_name}"))?;
-            Ok(Box::new(file))
+            Box::new(file)
         }
-    }
+    };
+
+    Ok(Box::new(BufWriter::new(writer)))
 }
 
 pub fn run(reader: impl Read, writer: impl Write) -> Result<()> {
@@ -102,7 +104,7 @@ pub fn run(reader: impl Read, writer: impl Write) -> Result<()> {
 
     let track = create_gpx(line_string, route_name);
 
-    write_gpx(track, BufWriter::new(writer)).context("Failed to write GPX data")?;
+    write_gpx(track, writer).context("Failed to write GPX data")?;
 
     Ok(())
 }
