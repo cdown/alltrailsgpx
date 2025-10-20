@@ -87,12 +87,12 @@ pub fn extract_route_name(json: &Value) -> Result<RouteName<'_>, Error> {
     Ok(RouteName(name_str))
 }
 
-pub fn create_gpx(line_string: geo_types::LineString<f64>, name: RouteName) -> Track {
-    let waypoints = line_string
-        .0
+pub fn create_gpx(line_string: geo_types::LineString<f64>, name: RouteName<'_>) -> Track {
+    let waypoints: Vec<Waypoint> = line_string
+        .into_inner()
         .into_iter()
         .map(|coord| Waypoint::new(coord.into()))
-        .collect::<Vec<_>>();
+        .collect();
 
     let segment = TrackSegment { points: waypoints };
 
