@@ -19,3 +19,11 @@ gpx = "0.10.0"
 polyline = "0.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
+
+[lib]
+name = "alltrailsgpx"
+path = "src/lib.rs"
+
+[[bin]]
+name = "alltrailsgpx"
+path = "src/main.rs"
