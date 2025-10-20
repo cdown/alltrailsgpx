@@ -3,7 +3,7 @@ use clap::Parser;
 use gpx::{Gpx, GpxVersion, Track, TrackSegment, Waypoint};
 use serde_json::Value;
 use std::fs::File;
-use std::io::{BufWriter, Read, Write};
+use std::io::{BufReader, BufWriter, Read, Write};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -15,24 +15,6 @@ struct Args {
     /// The GPX file to create. Defaults to stdout.
     #[arg(short, long)]
     output: Option<String>,
-}
-
-fn read_input(input: &Option<String>) -> Result<String> {
-    let mut contents = String::new();
-    match input.as_deref() {
-        None | Some("-") => {
-            std::io::stdin()
-                .read_to_string(&mut contents)
-                .context("Error reading from stdin")?;
-        }
-        Some(file_name) => {
-            let mut file = File::open(file_name)
-                .with_context(|| format!("Failed to open input file: {file_name}"))?;
-            file.read_to_string(&mut contents)
-                .context("Error reading input file")?;
-        }
-    }
-    Ok(contents)
 }
 
 fn find_in_json<'a>(json: &'a Value, paths: &[&str]) -> Option<&'a Value> {
@@ -90,11 +72,30 @@ fn write_gpx<W: Write>(track: Track, writer: W) -> Result<()> {
     gpx::write(&gpx, writer).context("Error writing GPX data")
 }
 
-fn main() -> Result<()> {
-    let args = Args::parse();
+fn get_input_reader(input: &Option<String>) -> Result<Box<dyn Read>> {
+    match input.as_deref() {
+        None | Some("-") => Ok(Box::new(std::io::stdin().lock())),
+        Some(file_name) => {
+            let file = File::open(file_name)
+                .with_context(|| format!("Failed to open input file: {file_name}"))?;
+            Ok(Box::new(BufReader::new(file)))
+        }
+    }
+}
 
-    let json_str = read_input(&args.input).context("Failed to read input")?;
-    let json: Value = serde_json::from_str(&json_str).context("Failed to parse JSON input")?;
+fn get_output_writer(output: &Option<String>) -> Result<Box<dyn Write>> {
+    match output.as_deref() {
+        None | Some("-") => Ok(Box::new(std::io::stdout())),
+        Some(file_name) => {
+            let file = File::create(file_name)
+                .with_context(|| format!("Failed to create file: {file_name}"))?;
+            Ok(Box::new(file))
+        }
+    }
+}
+
+fn run<R: Read, W: Write>(reader: R, writer: W) -> Result<()> {
+    let json: Value = serde_json::from_reader(reader).context("Failed to parse JSON input")?;
 
     let polyline_str = extract_polyline(&json)?;
     let route_name = extract_route_name(&json)?;
@@ -104,17 +105,16 @@ fn main() -> Result<()> {
 
     let track = create_gpx(line_string, route_name);
 
-    match args.output.as_deref() {
-        None | Some("-") => {
-            write_gpx(track, BufWriter::new(std::io::stdout()))
-                .context("Failed to write GPX to stdout")?;
-        }
-        Some(file_name) => {
-            let file = File::create(file_name)
-                .with_context(|| format!("Failed to create file: {file_name}"))?;
-            write_gpx(track, BufWriter::new(file)).context("Failed to write GPX file")?;
-        }
-    };
+    write_gpx(track, BufWriter::new(writer)).context("Failed to write GPX data")?;
 
     Ok(())
+}
+
+fn main() -> Result<()> {
+    let args = Args::parse();
+
+    let reader = get_input_reader(&args.input)?;
+    let writer = get_output_writer(&args.output)?;
+
+    run(reader, writer)
 }
