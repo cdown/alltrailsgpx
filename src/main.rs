@@ -9,11 +9,11 @@ use std::io::{BufWriter, Read, Write};
 #[command(author, version, about)]
 struct Args {
     /// The input JSON file containing the polyline data. Defaults to stdin.
-    #[clap(short, long)]
+    #[arg(short, long)]
     input: Option<String>,
 
     /// The GPX file to create. Defaults to stdout.
-    #[clap(short, long)]
+    #[arg(short, long)]
     output: Option<String>,
 }
 
