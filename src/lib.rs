@@ -16,7 +16,7 @@ pub struct Args {
     pub output: Option<String>,
 }
 
-pub fn find_in_json<'a>(json: &'a Value, paths: &[&str]) -> Option<&'a Value> {
+pub fn find_in_json<'json>(json: &'json Value, paths: &[&str]) -> Option<&'json Value> {
     paths.iter().find_map(|path| json.pointer(path))
 }
 
@@ -116,9 +116,9 @@ mod tests {
     use serde_json::{json, Value};
     use std::io::BufReader;
 
-    struct TestCase<'a> {
-        name: &'a str,
-        route_name: &'a str,
+    struct TestCase<'tc> {
+        name: &'tc str,
+        route_name: &'tc str,
         coords: Vec<Coord>,
         json_builder: Box<dyn Fn(&str) -> Value>,
     }
