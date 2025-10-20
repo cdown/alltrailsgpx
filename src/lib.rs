@@ -1,9 +1,40 @@
-use anyhow::{Context, Result};
 use derive_more::Deref;
 use gpx::{Gpx, GpxVersion, Track, TrackSegment, Waypoint};
 use serde_json::Value;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Polyline data not found in JSON")]
+    PolylineNotFound,
+
+    #[error("Polyline data is not a string")]
+    PolylineNotString,
+
+    #[error("Route name not found in JSON")]
+    RouteNameNotFound,
+
+    #[error("Route name is not a string")]
+    RouteNameNotString,
+
+    #[error("Failed to decode polyline: {0}")]
+    PolylineDecodeError(#[from] polyline::errors::PolylineError),
+
+    #[error("Failed to parse JSON input: {0}")]
+    JsonParseError(#[from] serde_json::Error),
+
+    #[error("Failed to open file: {path}")]
+    FileError {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("Error writing GPX data: {0}")]
+    GpxWriteError(#[from] gpx::errors::GpxError),
+}
 
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about)]
@@ -29,7 +60,7 @@ pub fn find_in_json<'json>(json: &'json Value, paths: &[&str]) -> Option<&'json 
 
 // - detail=offline: has "trails" array at root (e.g., /trails/0/defaultMap/routes/0/...)
 // - detail=deep: has "maps" array at root (e.g., /maps/0/routes/0/...)
-pub fn extract_polyline(json: &Value) -> Result<Polyline<'_>> {
+pub fn extract_polyline(json: &Value) -> Result<Polyline<'_>, Error> {
     let polyline_str = find_in_json(
         json,
         &[
@@ -37,18 +68,18 @@ pub fn extract_polyline(json: &Value) -> Result<Polyline<'_>> {
             "/maps/0/routes/0/lineSegments/0/polyline/pointsData",
         ],
     )
-    .context("Polyline data not found in JSON")?
+    .ok_or(Error::PolylineNotFound)?
     .as_str()
-    .context("Polyline data is not a string")?;
+    .ok_or(Error::PolylineNotString)?;
 
     Ok(Polyline(polyline_str))
 }
 
-pub fn extract_route_name(json: &Value) -> Result<RouteName<'_>> {
+pub fn extract_route_name(json: &Value) -> Result<RouteName<'_>, Error> {
     let name_str = find_in_json(json, &["/trails/0/name", "/maps/0/name"])
-        .context("Route name not found in JSON")?
+        .ok_or(Error::RouteNameNotFound)?
         .as_str()
-        .context("Route name data is not a string")?;
+        .ok_or(Error::RouteNameNotString)?;
 
     Ok(RouteName(name_str))
 }
@@ -69,7 +100,7 @@ pub fn create_gpx(line_string: geo_types::LineString<f64>, name: RouteName) -> T
     }
 }
 
-pub fn write_gpx(track: Track, writer: impl Write) -> Result<()> {
+pub fn write_gpx(track: Track, writer: impl Write) -> Result<(), Error> {
     let gpx = Gpx {
         version: GpxVersion::Gpx11,
         creator: Some("alltrailsgpx".to_string()),
@@ -77,26 +108,30 @@ pub fn write_gpx(track: Track, writer: impl Write) -> Result<()> {
         ..Default::default()
     };
 
-    gpx::write(&gpx, writer).context("Error writing GPX data")
+    Ok(gpx::write(&gpx, writer)?)
 }
 
-pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn Read>> {
+pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn Read>, Error> {
     match input.as_deref() {
         None | Some("-") => Ok(Box::new(std::io::stdin().lock())),
         Some(file_name) => {
-            let file = File::open(file_name)
-                .with_context(|| format!("Failed to open input file: {file_name}"))?;
+            let file = File::open(file_name).map_err(|source| Error::FileError {
+                path: file_name.to_string(),
+                source,
+            })?;
             Ok(Box::new(BufReader::new(file)))
         }
     }
 }
 
-pub fn get_output_writer(output: &Option<String>) -> Result<Box<dyn Write>> {
+pub fn get_output_writer(output: &Option<String>) -> Result<Box<dyn Write>, Error> {
     let writer: Box<dyn Write> = match output.as_deref() {
         None | Some("-") => Box::new(std::io::stdout()),
         Some(file_name) => {
-            let file = File::create(file_name)
-                .with_context(|| format!("Failed to create file: {file_name}"))?;
+            let file = File::create(file_name).map_err(|source| Error::FileError {
+                path: file_name.to_string(),
+                source,
+            })?;
             Box::new(file)
         }
     };
@@ -104,18 +139,17 @@ pub fn get_output_writer(output: &Option<String>) -> Result<Box<dyn Write>> {
     Ok(Box::new(BufWriter::new(writer)))
 }
 
-pub fn run(reader: impl Read, writer: impl Write) -> Result<()> {
-    let json: Value = serde_json::from_reader(reader).context("Failed to parse JSON input")?;
+pub fn run(reader: impl Read, writer: impl Write) -> Result<(), Error> {
+    let json: Value = serde_json::from_reader(reader)?;
 
     let polyline = extract_polyline(&json)?;
     let route_name = extract_route_name(&json)?;
 
-    let line_string =
-        polyline::decode_polyline(&polyline, 5).context("Failed to decode polyline")?;
+    let line_string = polyline::decode_polyline(&polyline, 5)?;
 
     let track = create_gpx(line_string, route_name);
 
-    write_gpx(track, writer).context("Failed to write GPX data")?;
+    write_gpx(track, writer)?;
 
     Ok(())
 }
