@@ -36,13 +36,14 @@ fn extract_polyline(json: &Value) -> Result<&str> {
     .context("Polyline data is not a string")
 }
 
-fn extract_route_name(json: &Value) -> Result<String> {
-    Ok(find_in_json(json, &["/trails/0/name", "/maps/0/name"])
+fn extract_route_name(json: &Value) -> Result<&str> {
+    find_in_json(json, &["/trails/0/name", "/maps/0/name"])
         .context("Route name not found in JSON")?
-        .to_string())
+        .as_str()
+        .context("Route name data is not a string")
 }
 
-fn create_gpx(line_string: geo_types::LineString<f64>, name: String) -> Track {
+fn create_gpx(line_string: geo_types::LineString<f64>, name: &str) -> Track {
     let waypoints = line_string
         .0
         .into_iter()
@@ -55,7 +56,7 @@ fn create_gpx(line_string: geo_types::LineString<f64>, name: String) -> Track {
     let segment = TrackSegment { points: waypoints };
 
     Track {
-        name: Some(name),
+        name: Some(name.to_string()),
         segments: vec![segment],
         ..Default::default()
     }
