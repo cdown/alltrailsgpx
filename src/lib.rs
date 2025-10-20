@@ -5,6 +5,9 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use thiserror::Error;
 
+const POLYLINE_PRECISION: u32 = 5;
+const GPX_CREATOR: &str = "alltrailsgpx";
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Polyline data not found in JSON")]
@@ -103,7 +106,7 @@ pub fn create_gpx(line_string: geo_types::LineString<f64>, name: RouteName) -> T
 pub fn write_gpx(track: Track, writer: impl Write) -> Result<(), Error> {
     let gpx = Gpx {
         version: GpxVersion::Gpx11,
-        creator: Some("alltrailsgpx".to_string()),
+        creator: Some(GPX_CREATOR.to_string()),
         tracks: vec![track],
         ..Default::default()
     };
@@ -145,7 +148,7 @@ pub fn run(reader: impl Read, writer: impl Write) -> Result<(), Error> {
     let polyline = extract_polyline(&json)?;
     let route_name = extract_route_name(&json)?;
 
-    let line_string = polyline::decode_polyline(&polyline, 5)?;
+    let line_string = polyline::decode_polyline(&polyline, POLYLINE_PRECISION)?;
 
     let track = create_gpx(line_string, route_name);
 
@@ -170,9 +173,9 @@ mod tests {
         json_builder: Box<dyn Fn(&str) -> Value>,
     }
 
-    fn run_conversion_test(case: TestCase) {
-        let polyline_str =
-            encode_coordinates(case.coords.clone(), 5).expect("Failed to encode polyline");
+    fn run_conversion_test(case: TestCase<'_>) {
+        let polyline_str = encode_coordinates(case.coords.clone(), POLYLINE_PRECISION)
+            .expect("Failed to encode polyline");
         let json_value = (case.json_builder)(&polyline_str);
         let json_input = json_value.to_string();
         let parsed_gpx = run_and_parse_gpx(&json_input);
@@ -278,7 +281,7 @@ mod tests {
     }
 
     fn assert_gpx_basics(gpx: &Gpx, expected_name: &str, expected_point_count: usize) {
-        assert_eq!(gpx.creator.as_deref(), Some("alltrailsgpx"));
+        assert_eq!(gpx.creator.as_deref(), Some(GPX_CREATOR));
         assert_eq!(gpx.tracks.len(), 1, "Should contain exactly one track");
 
         let track = &gpx.tracks[0];
