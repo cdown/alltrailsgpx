@@ -116,3 +116,139 @@ fn main() -> Result<()> {
 
     run(reader, writer)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use geo_types::Coord;
+    use gpx::Gpx;
+    use polyline::encode_coordinates;
+    use serde_json::{json, Value};
+    use std::io::BufReader;
+
+    struct TestCase<'a> {
+        name: &'a str,
+        route_name: &'a str,
+        coords: Vec<Coord>,
+        json_builder: Box<dyn Fn(&str) -> Value>,
+    }
+
+    fn run_conversion_test(case: TestCase) {
+        let polyline_str =
+            encode_coordinates(case.coords.clone(), 5).expect("Failed to encode polyline");
+        let json_value = (case.json_builder)(&polyline_str);
+        let json_input = json_value.to_string();
+        let parsed_gpx = run_and_parse_gpx(&json_input);
+
+        assert_gpx_basics(&parsed_gpx, case.route_name, case.coords.len());
+
+        let points = &parsed_gpx.tracks[0].segments[0].points;
+        for (i, coord) in case.coords.iter().enumerate() {
+            let point = points[i].point();
+            assert!(
+                (point.y() - coord.y).abs() < 1e-6 && (point.x() - coord.x).abs() < 1e-6,
+                "Test case '{}' failed: point {} mismatch.\n Expected: ({:?})\n  Got: ({:?})",
+                case.name,
+                i,
+                coord,
+                point
+            );
+        }
+    }
+
+    #[test]
+    fn test_offline_format_conversion() {
+        let case = TestCase {
+            name: "offline_format",
+            route_name: "My Test Trail",
+            coords: vec![
+                Coord { x: -120.2, y: 38.5 },
+                Coord {
+                    x: -120.95,
+                    y: 40.7,
+                },
+                Coord {
+                    x: -121.2116,
+                    y: 40.9416,
+                },
+            ],
+            json_builder: Box::new(|polyline| {
+                json!({
+                    "trails": [
+                        {
+                            "name": "My Test Trail",
+                            "defaultMap": {
+                                "routes": [
+                                    {
+                                        "lineSegments": [
+                                            {
+                                                "polyline": {
+                                                    "pointsData": polyline
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                })
+            }),
+        };
+        run_conversion_test(case);
+    }
+
+    #[test]
+    fn test_deep_format_conversion() {
+        let case = TestCase {
+            name: "deep_format",
+            route_name: "My Other Trail",
+            coords: vec![Coord { x: -121.0, y: 38.8 }],
+            json_builder: Box::new(|polyline| {
+                json!({
+                    "maps": [
+                        {
+                            "name": "My Other Trail",
+                            "routes": [
+                                {
+                                    "lineSegments": [
+                                        {
+                                            "polyline": {
+                                                "pointsData": polyline
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                })
+            }),
+        };
+        run_conversion_test(case);
+    }
+
+    fn run_and_parse_gpx(json_input: &str) -> Gpx {
+        let mut output_buffer: Vec<u8> = Vec::new();
+        run(json_input.as_bytes(), &mut output_buffer).unwrap_or_else(|e| {
+            panic!(
+                "Test run failed: {e:?}\nOutput: {}",
+                String::from_utf8_lossy(&output_buffer)
+            )
+        });
+
+        gpx::read(BufReader::new(output_buffer.as_slice())).expect("Failed to parse output GPX")
+    }
+
+    fn assert_gpx_basics(gpx: &Gpx, expected_name: &str, expected_point_count: usize) {
+        assert_eq!(gpx.creator.as_deref(), Some("alltrailsgpx"));
+        assert_eq!(gpx.tracks.len(), 1, "Should contain exactly one track");
+
+        let track = &gpx.tracks[0];
+        assert_eq!(track.name.as_deref(), Some(expected_name));
+        assert_eq!(track.segments.len(), 1, "Track should have one segment");
+
+        let points = &track.segments[0].points;
+        assert_eq!(points.len(), expected_point_count);
+    }
+}
