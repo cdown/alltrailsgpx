@@ -185,8 +185,9 @@ mod tests {
         let points = &parsed_gpx.tracks[0].segments[0].points;
         for (i, coord) in case.coords.iter().enumerate() {
             let point = points[i].point();
+            const TOLERANCE: f64 = 1e-6;
             assert!(
-                (point.y() - coord.y).abs() < 1e-6 && (point.x() - coord.x).abs() < 1e-6,
+                (point.y() - coord.y).abs() < TOLERANCE && (point.x() - coord.x).abs() < TOLERANCE,
                 "Test case '{}' failed: point {} mismatch.\n Expected: ({:?})\n  Got: ({:?})",
                 case.name,
                 i,
