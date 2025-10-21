@@ -2,7 +2,7 @@ use derive_more::Deref;
 use gpx::{Gpx, GpxVersion, Track, TrackSegment, Waypoint};
 use serde_json::Value;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use thiserror::Error;
 
 const POLYLINE_PRECISION: u32 = 5;
@@ -113,7 +113,7 @@ pub fn write_gpx(track: Track, writer: impl Write) -> Result<(), Error> {
     Ok(gpx::write(&gpx, writer)?)
 }
 
-pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn Read>, Error> {
+pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn BufRead>, Error> {
     match input.as_deref() {
         None | Some("-") => Ok(Box::new(std::io::stdin().lock())),
         Some(file_name) => {
