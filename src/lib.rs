@@ -128,7 +128,7 @@ pub fn get_input_reader(input: &Option<String>) -> Result<Box<dyn BufRead>, Erro
 
 pub fn get_output_writer(output: &Option<String>) -> Result<Box<dyn Write>, Error> {
     let writer: Box<dyn Write> = match output.as_deref() {
-        None | Some("-") => Box::new(std::io::stdout().lock()),
+        None | Some("-") => Box::new(BufWriter::new(std::io::stdout().lock())),
         Some(file_name) => {
             let file = File::create(file_name).map_err(|source| Error::FileError {
                 path: file_name.to_string(),
